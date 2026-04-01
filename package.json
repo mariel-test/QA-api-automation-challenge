@@ -1,0 +1,16 @@
+{
+  "name": "qa-takehome",
+  "version": "1.0.0",
+  "description": "QA Automation Challenge - DummyJSON API",
+  "scripts": {
+    "test:api": "playwright test tests/api",
+    "test:ui": "playwright test tests/ui",
+    "test:all": "playwright test",
+    "test:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.9.3"
+  }
+}
