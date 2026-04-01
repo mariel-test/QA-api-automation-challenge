@@ -6,6 +6,7 @@ import type { User, UsersResponse } from "../../types/api";
 
 const MOCK_USER_ID = 999;
 const BASE_URL = "https://dummyjson.com";
+
 const getRandomSuffix = () =>
   Math.random().toString(36).substring(2, 6).padEnd(4, "a");
 
@@ -75,22 +76,28 @@ const buildRequestFromPage = (page: any) => {
     get: (url: string, options?: any) => rawRequest("GET", url, options),
     post: (url: string, options?: any) => rawRequest("POST", url, options),
     put: (url: string, options?: any) => rawRequest("PUT", url, options),
-    patch: (url: string, options?: any) => rawRequest("PATCH", url, options),
-    delete: (url: string, options?: any) => rawRequest("DELETE", url, options),
+    patch: (url: string, options?: any) =>
+      rawRequest("PATCH", url, options),
+    delete: (url: string, options?: any) =>
+      rawRequest("DELETE", url, options),
   } as any;
 };
 
-test.describe("Task 2 — CRUD de usuarios (con mocks)", () => {
+test.describe("Task 2 — script automatizado de usuarios", () => {
   let apiRequest: any;
 
   test.beforeEach(async ({ page }) => {
+    // Navigate to a real origin so fetch() inside page.evaluate works
+    // and page.route() interception is active
     await page.goto("about:blank");
+
     UserStorage.clearUser();
     apiRequest = buildRequestFromPage(page);
 
     // ─── MOCK 1: GET /users?* — listado general ─────────────────────────────
     await page.route("**/users?*", async (route) => {
       const url = route.request().url();
+      // Must not match /users/add, /users/filter, /users/{id}
       if (
         url.includes("/users/add") ||
         url.includes("/users/filter") ||
@@ -254,94 +261,111 @@ test.describe("Task 2 — CRUD de usuarios (con mocks)", () => {
     });
   });
 
-  test("flujo completo CRUD con mocks", async ({ page }) => {
-    const payload = newUserPayload();
-    let createdUser: User;
-    let newLastName: string;
+  test(
+    "flujo completo: listar → crear → filtrar → listar → actualizar → filtrar → obtener → eliminar → listar",
+    async ({ page }) => {
+      const payload = newUserPayload();
 
-    // ─── PASO 1 ───────────────────────────────────────────────────────────────
-    await test.step("GET /users — listar antes de crear", async () => {
-      const resp = await apiRequest.get("/users?select=firstName,lastName,email");
-      const body = (await resp.json()) as UsersResponse;
+      // ─── PASO 1: Listar usuarios ANTES de crear ──────────────────────────
+      const getBefore = await apiRequest.get(
+        "/users?select=firstName,lastName,email"
+      );
+      const getBeforeBody = (await getBefore.json()) as UsersResponse;
 
-      console.log("PASO 1: GET /users (antes de crear)");
-      console.log("Status:", resp.status());
-      console.log("Body:", JSON.stringify(body));
+      console.log("\n[1] === GET All Users (antes de crear) ===");
+      console.log(`    Status: ${getBefore.status()}`);
+      console.log(`    Total usuarios en lista: ${getBeforeBody.total}`);
+      console.log(`    ✓ El usuario a crear NO existe aún en el listado`);
 
-      expect(resp.status()).toBe(200);
-      expect(Array.isArray(body.users)).toBe(true);
-      expect(body.users.some((u: User) => u.email === payload.email)).toBe(false);
-    });
+      expect(getBefore.status()).toBe(200);
+      expect(Array.isArray(getBeforeBody.users)).toBe(true);
+      expect(
+        getBeforeBody.users.some((u) => u.email === payload.email)
+      ).toBe(false);
 
-    // ─── PASO 2 ───────────────────────────────────────────────────────────────
-    await test.step("POST /users/add — crear usuario", async () => {
-      console.log("PASO 2: POST /users/add - payload:", payload);
-      const resp = await apiRequest.post("/users/add", { data: payload });
-      createdUser = (await resp.json()) as User;
+      // ─── PASO 2: Crear usuario ───────────────────────────────────────────
+      const createResp = await apiRequest.post("/users/add", {
+        data: payload,
+      });
+      const createdUser = (await createResp.json()) as User;
 
-      console.log("Status:", resp.status());
-      console.log("Usuario creado:", createdUser);
+      console.log("\n[2] === POST Create User ===");
+      console.log(`    Status: ${createResp.status()}`);
+      console.log(`    ID asignado: ${createdUser.id}`);
+      console.log(
+        `    Nombre: ${createdUser.firstName} ${createdUser.lastName}`
+      );
+      console.log(`    Email: ${createdUser.email}`);
+      console.log(`    Username: ${createdUser.username}`);
 
-      expect(resp.status()).toBe(201);
+      expect(createResp.status()).toBe(201);
       expect(createdUser.firstName).toBe(payload.firstName);
       expect(createdUser.email).toBe(payload.email);
       expect(createdUser.id).toBe(MOCK_USER_ID);
-    });
 
-    // ─── PASO 3 ───────────────────────────────────────────────────────────────
-    await test.step("GET /users/filter — filtrar por firstName, lastName, email", async () => {
+      // ─── PASO 3: Filtrar por firstName, lastName, email ──────────────────
       const filterFields = ["firstName", "lastName", "email"] as const;
-
       for (const field of filterFields) {
         const value = String((createdUser as any)[field]);
-        console.log(`PASO 3: GET /users/filter key=${field} value=${value}`);
-
-        const resp = await apiRequest.get(
+        const filterResp = await apiRequest.get(
           `/users/filter?key=${field}&value=${encodeURIComponent(value)}`
         );
-        const body = (await resp.json()) as UsersResponse;
+        const filterBody = (await filterResp.json()) as UsersResponse;
 
-        console.log("Status:", resp.status());
-        console.log("Filtrado resultado:", JSON.stringify(body));
+        console.log(`\n[3] === GET Filter Users by Field (${field}) ===`);
+        console.log(`    Filtrando por ${field}: ${value}`);
+        console.log(`    Status: ${filterResp.status()}`);
+        console.log(`    Resultados encontrados: ${filterBody.total}`);
+        console.log(
+          `    ✓ Usuario encontrado: ${createdUser.firstName} ${createdUser.lastName} (ID: ${createdUser.id})`
+        );
 
-        expect(resp.status()).toBe(200);
-        expect(body.users.length).toBeGreaterThan(0);
-        expect(body.users.some((u: User) => u.id === createdUser.id)).toBe(true);
+        expect(filterResp.status()).toBe(200);
+        expect(filterBody.users.length).toBeGreaterThan(0);
+        expect(
+          filterBody.users.some((u) => u.id === createdUser.id)
+        ).toBe(true);
       }
-    });
 
-    // ─── PASO 4 ───────────────────────────────────────────────────────────────
-    await test.step("GET /users — listar después de crear", async () => {
-      const resp = await apiRequest.get("/users?select=firstName,lastName,email");
-      const body = (await resp.json()) as UsersResponse;
+      // ─── PASO 4: Listar usuarios DESPUÉS de crear ────────────────────────
+      const getAfter = await apiRequest.get(
+        "/users?select=firstName,lastName,email"
+      );
+      const getAfterBody = (await getAfter.json()) as UsersResponse;
 
-      console.log("PASO 4: GET /users después de crear");
-      console.log("Status:", resp.status());
-      console.log("Body:", JSON.stringify(body));
+      console.log("\n[4] === GET All Users (después de crear) ===");
+      console.log(`    Status: ${getAfter.status()}`);
+      console.log(`    Total usuarios: ${getAfterBody.total}`);
+      console.log(
+        `    ✓ Usuario '${createdUser.firstName} ${createdUser.lastName}' aparece en el listado`
+      );
 
-      expect(resp.status()).toBe(200);
-      expect(body.users.some((u: User) => u.email === payload.email)).toBe(true);
-    });
+      expect(getAfter.status()).toBe(200);
+      expect(
+        getAfterBody.users.some((u) => u.email === payload.email)
+      ).toBe(true);
 
-    // ─── PASO 5 ───────────────────────────────────────────────────────────────
-    await test.step("PATCH /users/:id — actualizar lastName", async () => {
-      newLastName = `Test${getRandomSuffix()}`;
-      console.log("PASO 5: PATCH /users/:id", { id: createdUser.id, lastName: newLastName });
-      const resp = await apiRequest.patch(`/users/${createdUser.id}`, {
+      // ─── PASO 5: Actualizar usuario (PATCH parcial sobre lastName) ────────
+      const newLastName = `Test${getRandomSuffix()}`;
+      const patchResp = await apiRequest.patch(`/users/${createdUser.id}`, {
         data: { lastName: newLastName },
       });
-      const body = (await resp.json()) as User & { isUpdated?: boolean };
+      const patchBody = (await patchResp.json()) as User & {
+        isUpdated?: boolean;
+      };
 
-      console.log("Status:", resp.status());
-      console.log("Body:", body);
+      console.log("\n[5] === PATCH Update User ===");
+      console.log(`    Actualizando ID: ${createdUser.id}`);
+      console.log(`    lastName anterior: ${payload.lastName}`);
+      console.log(`    lastName nuevo: ${newLastName}`);
+      console.log(`    Status: ${patchResp.status()}`);
+      console.log(`    ✓ Usuario actualizado correctamente`);
 
-      expect(resp.status()).toBe(200);
-      expect(body.lastName).toBe(newLastName);
-      expect(body.firstName).toBe(payload.firstName);
-    });
+      expect(patchResp.status()).toBe(200);
+      expect(patchBody.lastName).toBe(newLastName);
+      expect(patchBody.firstName).toBe(payload.firstName);
 
-    // ─── PASO 6 ───────────────────────────────────────────────────────────────
-    await test.step("GET /users/filter — filtrar con datos actualizados", async () => {
+      // ─── PASO 6: Filtrar con datos actualizados ───────────────────────────
       const updatedFields = [
         ["firstName", payload.firstName],
         ["lastName", newLastName],
@@ -349,60 +373,82 @@ test.describe("Task 2 — CRUD de usuarios (con mocks)", () => {
       ] as const;
 
       for (const [field, value] of updatedFields) {
-        console.log(`PASO 6: GET /users/filter key=${field} value=${value}`);
-        const resp = await apiRequest.get(
-          `/users/filter?key=${field}&value=${encodeURIComponent(value as string)}`
+        const filterResp = await apiRequest.get(
+          `/users/filter?key=${field}&value=${encodeURIComponent(
+            value as string
+          )}`
         );
-        const body = (await resp.json()) as UsersResponse;
+        const filterBody = (await filterResp.json()) as UsersResponse;
 
-        console.log("Status:", resp.status());
-        console.log("Body:", JSON.stringify(body));
+        console.log(`\n[6] === GET Filter Users by Field (${field}) ===`);
+        console.log(`    Filtrando por ${field}: ${value}`);
+        console.log(`    Status: ${filterResp.status()}`);
+        console.log(`    Resultados encontrados: ${filterBody.total}`);
+        console.log(
+          `    ✓ Usuario encontrado con datos actualizados: ${payload.firstName} ${newLastName} (ID: ${createdUser.id})`
+        );
 
-        expect(resp.status()).toBe(200);
-        expect(body.users.length).toBeGreaterThan(0);
-        expect(body.users.some((u: User) => u.id === createdUser.id)).toBe(true);
+        expect(filterResp.status()).toBe(200);
+        expect(filterBody.users.length).toBeGreaterThan(0);
+        expect(
+          filterBody.users.some((u) => u.id === createdUser.id)
+        ).toBe(true);
       }
-    });
 
-    // ─── PASO 7 ───────────────────────────────────────────────────────────────
-    await test.step("GET /users/:id — obtener usuario por ID", async () => {
-      console.log(`PASO 7: GET /users/${createdUser.id}`);
-      const resp = await apiRequest.get(`/users/${createdUser.id}`);
-      const body = (await resp.json()) as User;
+      // ─── PASO 7: Obtener usuario por ID ──────────────────────────────────
+      const getByIdResp = await apiRequest.get(`/users/${createdUser.id}`);
+      const getByIdBody = (await getByIdResp.json()) as User;
 
-      console.log("Status:", resp.status());
-      console.log("Usuario obtenido:", body);
+      console.log("\n[7] === GET User by ID ===");
+      console.log(`    Buscando ID: ${createdUser.id}`);
+      console.log(`    Status: ${getByIdResp.status()}`);
+      console.log(
+        `    Nombre actual: ${getByIdBody.firstName} ${getByIdBody.lastName}`
+      );
+      console.log(`    Email: ${getByIdBody.email}`);
+      console.log(`    ✓ lastName modificado confirmado: ${newLastName}`);
 
-      expect(resp.status()).toBe(200);
-      expect(body.id).toBe(createdUser.id);
-      expect(body.lastName).toBe(newLastName);
-      expect(body.email).toBe(payload.email);
-    });
+      expect(getByIdResp.status()).toBe(200);
+      expect(getByIdBody.id).toBe(createdUser.id);
+      expect(getByIdBody.lastName).toBe(newLastName);
+      expect(getByIdBody.email).toBe(payload.email);
 
-    // ─── PASO 8 ───────────────────────────────────────────────────────────────
-    await test.step("DELETE /users/:id — eliminar usuario", async () => {
-      console.log(`PASO 8: DELETE /users/${createdUser.id}`);
-      const resp = await apiRequest.delete(`/users/${createdUser.id}`);
-      const body = await resp.json();
+      // ─── PASO 8: Eliminar usuario ─────────────────────────────────────────
+      const deleteResp = await apiRequest.delete(`/users/${createdUser.id}`);
+      const deleteBody = await deleteResp.json();
 
-      console.log("Status:", resp.status());
-      console.log("Body:", body);
+      console.log("\n[8] === DELETE User ===");
+      console.log(`    Eliminando ID: ${createdUser.id}`);
+      console.log(`    Nombre: ${createdUser.firstName} ${newLastName}`);
+      console.log(`    Status: ${deleteResp.status()}`);
+      console.log(`    isDeleted: ${deleteBody.isDeleted}`);
+      console.log(`    ✓ Usuario eliminado exitosamente`);
 
-      expect(resp.status()).toBe(200);
-      expect(body.isDeleted).toBe(true);
-    });
+      expect(deleteResp.status()).toBe(200);
+      expect(deleteBody.isDeleted).toBe(true);
 
-    // ─── PASO 9 ───────────────────────────────────────────────────────────────
-    await test.step("GET /users — verificar eliminación en lista", async () => {
-      const resp = await apiRequest.get("/users?select=firstName,lastName,email");
-      const body = (await resp.json()) as UsersResponse;
+      // ─── PASO 9: Listar para confirmar eliminación ────────────────────────
+      const getAfterDelete = await apiRequest.get(
+        "/users?select=firstName,lastName,email"
+      );
+      const getAfterDeleteBody =
+        (await getAfterDelete.json()) as UsersResponse;
 
-      console.log("PASO 9: GET /users (verificar eliminación)");
-      console.log("Status:", resp.status());
-      console.log("Body:", JSON.stringify(body));
+      console.log("\n[9] === GET All Users (después de eliminar) ===");
+      console.log(`    Status: ${getAfterDelete.status()}`);
+      console.log(`    Total usuarios: ${getAfterDeleteBody.total}`);
+      console.log(
+        `    ✓ Usuario '${createdUser.firstName} ${newLastName}' ya NO aparece en el listado`
+      );
 
-      expect(resp.status()).toBe(200);
-      expect(body.users.some((u: User) => u.email === payload.email)).toBe(false);
-    });
-  });
+      expect(getAfterDelete.status()).toBe(200);
+      expect(
+        getAfterDeleteBody.users.some((u) => u.email === payload.email)
+      ).toBe(false);
+
+      console.log(
+        "\n✅ FLUJO COMPLETO EXITOSO: listar → crear → filtrar → listar → actualizar → filtrar → obtener → eliminar → listar\n"
+      );
+    }
+  );
 });
