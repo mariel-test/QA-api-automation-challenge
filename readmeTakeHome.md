@@ -39,7 +39,9 @@ i. Control de Integridad (Email): Buscar por email para asegurar que no hubo cam
 j. Búsqueda por ID: Verificar la localización del usuario mediante su ID único.
 k. Borrar Usuario: Confirmar la eliminación exitosa del registro.
 l. Verificación Final: Asegurar que el usuario ya no figure en la lista y el contador sea correcto.
+
 2. Escenario - E2E de Autenticación
+
 a. Login Exitoso: Verificar el acceso con credenciales válidas.
 b. Usuario Inexistente: Verificar el error cuando el usuario no existe en el sistema.
 c. Sin Contraseña: Verificar el comportamiento cuando no se ingresa ninguna clave.
