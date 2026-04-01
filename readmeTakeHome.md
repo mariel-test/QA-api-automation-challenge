@@ -4,7 +4,12 @@
 Se modificó el archivo de configuración para que se vean solo los reportes que serán evaluados. Existen dos tipos de reportes:
 * **Reporte HTML:** Para una visualización detallada en el navegador.
 * **Reporte en consola:** Para apreciar el impacto de datos simulados (mocks) y la generación de datos aleatorios en tiempo real.
-
+### Notas de ejecución
+- Los tests fueron validados y ejecutados exitosamente en entorno local (Windows/Mac).
+- Para ejecuciones en entornos Linux limpios (como CI/CD o Codespaces), se requiere la instalación de dependencias del sistema:
+  `npx playwright install-deps`
+- El Task 2 requiere un contexto de navegador para la ejecución de mocks E2E.
+  
 ### Nota 2
 Se trabajó con el soporte de **Claude Code** como generador de contexto, código y correcciones, y **Gemini** como alternativa para consultas.
 
