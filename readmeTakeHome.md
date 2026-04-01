@@ -46,25 +46,3 @@ a. Login Exitoso: Verificar el acceso con credenciales válidas.
 b. Usuario Inexistente: Verificar el error cuando el usuario no existe en el sistema.
 c. Sin Contraseña: Verificar el comportamiento cuando no se ingresa ninguna clave.
 d. Contraseña Inválida: Verificar el error cuando la contraseña es incorrecta.
-
-a. Verificar que no exista usuario en la lista de usuario
-b. Verificar Cracion Exitosa de Usuario
-	Para no alterar el archivo de datos test-data.ts en la repo, se crea un archivo de CRUD para la creacion de datos aleatorios.
-	Se crea usuario con datos aleatorios en archivo test-data-task2.ts y los siguientes paso se procede a trabajar en este archivo como parte del mockeo de los tests ya que no se cuenta con una BD de datos 
-c. Verificar Busqueda por  nombre y verificar contador de usuarios
-d. Verificar Busqueda por Apellido
-e. Verificar Busqueda por email
-f. Verificar que exista usuario en la lista de usuario y actualizacion de contador
-g. Verificar Actualizacion del apellido del usuario
-h. Verificar Busqueda por  nombre para chequear que no se haya actualizado dato
-i. Verificar Busqueda por email para chequear que no se haya actualizado dato
-j. Verificar Busqueda por ID de Usuario
-k. Verificar Borrar Usuario
-l. Verificar que no exista usuario despues de eliminado en la lista de usuario y verificar contador de usuarios
-
-##2. E2E de Autenticacion de contraseña
-
-a. Verificar login de usuario exitoso
-b. Verificar login de usuario invalido - usuario no existe
-c. Verificar login de usuario cuando no se ingresa contraseña
-d. Verificar login de usuario cuando la contraseña no existe
